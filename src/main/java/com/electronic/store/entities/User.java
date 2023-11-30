@@ -3,10 +3,11 @@ package com.electronic.store.entities;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -18,23 +19,30 @@ import java.util.List;
 public class User implements UserDetails {
     @Id
     private String userId;
-    @Column(name = "user_name",length = 100)
+    @Column(name = "user_name", length = 100)
     private String name;
-    @Column(name = "user_email",unique = true)
+    @Column(name = "user_email", unique = true)
     private String email;
-    @Column(name = "user_password",length = 500)
+    @Column(name = "user_password", length = 500)
     private String password;
     private String gender;
     @Column(length = 1000)
     private String about;
     @Column(name = "user_image_name")
     private String imageName;
-    @OneToMany(mappedBy = "user",fetch = FetchType.LAZY,cascade = CascadeType.REMOVE)
-    private List<Order> orders;
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
+    private List<Order> orders = new ArrayList<>();
+    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(name = "users_roles", joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id"))
+    private Set<Role> roles = new HashSet<>();
+    @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE)
+    private Cart cart;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return null;
+        Set<SimpleGrantedAuthority> authorities = this.roles.stream().map(role -> new SimpleGrantedAuthority(role.getRoleName())).collect(Collectors.toSet());
+        return authorities;
     }
 
     @Override
