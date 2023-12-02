@@ -2,9 +2,11 @@ package com.electronic.store.services.impl;
 
 import com.electronic.store.dtos.PageableResponse;
 import com.electronic.store.dtos.UserDto;
+import com.electronic.store.entities.Role;
 import com.electronic.store.entities.User;
 import com.electronic.store.exceptions.ResourceNotFoundException;
 import com.electronic.store.helper.Helper;
+import com.electronic.store.repositories.RoleRepository;
 import com.electronic.store.repositories.UserRepository;
 import com.electronic.store.services.UserService;
 import org.modelmapper.ModelMapper;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -35,23 +38,34 @@ public class UserServiceImpl implements UserService {
     private ModelMapper mapper;
     @Value("${user.profile.image.path}")
     private String imagePath;
-    private Logger logger= LoggerFactory.getLogger(UserServiceImpl.class);
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Value("${normal.role.id}")
+    private String normalRoleId;
+    @Autowired
+    private RoleRepository roleRepository;
+    private Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
+
     @Override
     public UserDto createUser(UserDto userDto) {
 
         //Generate unique id in string format
         String userId = UUID.randomUUID().toString();
         userDto.setUserId(userId);
+        //set encoding password
+        userDto.setPassword(passwordEncoder.encode(userDto.getPassword()));
 
         //  dto -> entity
-        User user=dtoToEntity(userDto);
+        User user = dtoToEntity(userDto);
+        //fetch role of normal and set it to user
+        Role role = roleRepository.findById(normalRoleId).get();
+        user.getRoles().add(role);
         User savedUser = userRepository.save(user);
 
         // entity -> dto
-        UserDto newDto =entityToDto(savedUser);
+        UserDto newDto = entityToDto(savedUser);
         return newDto;
     }
-
 
 
     @Override
@@ -63,7 +77,7 @@ public class UserServiceImpl implements UserService {
         user.setGender(userDto.getGender());
         user.setPassword(userDto.getPassword());
         user.setImageName(userDto.getImageName());
-        
+
         //save data
         User updatedUser = userRepository.save(user);
 
@@ -80,7 +94,7 @@ public class UserServiceImpl implements UserService {
         try {
             Path path = Paths.get(fullPath);
             Files.delete(path);
-        } catch (NoSuchFileException ex){
+        } catch (NoSuchFileException ex) {
             logger.info("user image not found in folder");
             ex.printStackTrace();
         } catch (IOException e) {
@@ -93,7 +107,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public PageableResponse<UserDto> getAllUser(int pageNo, int pageSize, String sortBy, String sortDir) {
         Sort sort = (sortDir.equalsIgnoreCase("desc")) ? (Sort.by(sortBy).descending()) : (Sort.by(sortBy).ascending());
-        Pageable pageable =PageRequest.of(pageNo,pageSize,sort);
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
         Page<User> page = userRepository.findAll(pageable);
 
         PageableResponse<UserDto> response = Helper.getPageableResponse(page, UserDto.class);
@@ -123,10 +137,10 @@ public class UserServiceImpl implements UserService {
 
 
     private UserDto entityToDto(User savedUser) {
-        return mapper.map(savedUser,UserDto.class);
+        return mapper.map(savedUser, UserDto.class);
     }
 
     private User dtoToEntity(UserDto userDto) {
-        return mapper.map(userDto,User.class);
+        return mapper.map(userDto, User.class);
     }
 }
